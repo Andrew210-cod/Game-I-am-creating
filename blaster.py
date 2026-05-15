@@ -4,11 +4,14 @@ import math
 import sys
 from dataclasses import dataclass, field
 from typing import List
+import numpy as np
 
 # ── Init ──────────────────────────────────────────────────────────────────────
 pygame.init()
-pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=512)
-
+pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
+pygame.mixer.music.load("66. The Final Battle.mp3")
+pygame.mixer.music.set_volume(0.5)
+pygame.mixer.set_num_channels(16)
 W, H = 900, 700
 screen = pygame.display.set_mode((W, H))
 pygame.display.set_caption("✦ NEON BLASTER ✦")
@@ -41,7 +44,7 @@ except:
 def make_sound(freq, duration_ms, wave="sine", volume=0.3):
     sr = 44100
     frames = int(sr * duration_ms / 1000)
-    buf = bytearray(frames * 2)
+    buf = np.zeros((frames, 2), dtype=np.int16)
     for i in range(frames):
         t = i / sr
         fade = min(1.0, (frames - i) / (frames * 0.3))
@@ -53,13 +56,9 @@ def make_sound(freq, duration_ms, wave="sine", volume=0.3):
             v = random.uniform(-1, 1)
         sample = int(v * fade * volume * 32767)
         sample = max(-32768, min(32767, sample))
-        buf[i*2]   = sample & 0xFF
-        buf[i*2+1] = (sample >> 8) & 0xFF
-    sound = pygame.sndarray.make_sound(
-        __import__("numpy").frombuffer(bytes(buf), dtype=__import__("numpy").int16)
-    )
-    return sound
-
+        buf[i][0] = sample  
+        buf[i][1] = sample
+    return pygame.sndarray.make_sound(buf)
 try:
     import numpy as np
     SND_SHOOT   = make_sound(880,  80,  "sine",   0.15)
@@ -68,6 +67,7 @@ try:
     SND_LEVEL   = make_sound(660,  500, "sine",   0.3)
     SND_DIE     = make_sound(80,   600, "noise",  0.3)
     SOUND_ON = True
+    print("sound is okay")
 except:
     SOUND_ON = False
     class DummySound:
@@ -416,6 +416,7 @@ class Powerup:
     def radius(self): return 16
 
     def apply(self, player):
+        play(SND_LEVEL)
         if self.type == "triple":
             player.power = 3; player.power_timer = 600
         elif self.type == "shield":
@@ -450,6 +451,7 @@ class Enemy:
             self.shoot_cd = random.randint(80, 150)
             a = math.atan2(dy, dx) - math.pi/2
             bullets.append(Bullet(self.x, self.y, a, RED, speed=6, enemy=True))
+            play(SND_SHOOT)
         if self.y > H + 60: self.alive = False
 
     def draw(self, surf):
@@ -713,6 +715,7 @@ def run_game():
 def title_screen():
     t = 0
     local_stars = [Star() for _ in range(200)]
+    pygame.mixer_music.play(loops=-1)
     while True:
         clock.tick(60)
         for event in pygame.event.get():
